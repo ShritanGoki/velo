@@ -15,10 +15,11 @@ from typing import Optional, Union
 
 
 class MsgType(IntEnum):
-    NEW_ORDER = 0x01  # client -> server
-    CANCEL = 0x02     # client -> server
-    FILL = 0x10       # server -> client
-    ACK = 0x11        # server -> client
+    NEW_ORDER = 0x01        # client -> server
+    CANCEL = 0x02           # client -> server
+    SUBSCRIBE_FILLS = 0x03  # client -> server, empty payload
+    FILL = 0x10             # server -> client
+    ACK = 0x11              # server -> client
 
 
 class Side(IntEnum):
@@ -33,12 +34,13 @@ class OrderType(IntEnum):
 
 _NEW_ORDER_FMT = "!QBBqI"  # client_order_id, side, order_type, price_ticks, quantity
 _CANCEL_FMT = "!Q"         # client_order_id
-_FILL_FMT = "!QQqIQ"       # resting_id, incoming_id, price_ticks, quantity, timestamp
+_FILL_FMT = "!QQBqIQ"      # resting_id, incoming_id, resting_side, price_ticks, quantity, timestamp
 _ACK_FMT = "!QBB"          # client_order_id, request_type, status
 
 PAYLOAD_SIZE = {
     MsgType.NEW_ORDER: struct.calcsize(_NEW_ORDER_FMT),
     MsgType.CANCEL: struct.calcsize(_CANCEL_FMT),
+    MsgType.SUBSCRIBE_FILLS: 0,
     MsgType.FILL: struct.calcsize(_FILL_FMT),
     MsgType.ACK: struct.calcsize(_ACK_FMT),
 }
@@ -62,6 +64,7 @@ class CancelMsg:
 class FillEvent:
     resting_order_id: int
     incoming_order_id: int
+    resting_side: Side
     price_ticks: int
     quantity: int
     timestamp: int
@@ -105,8 +108,13 @@ def decode_cancel(payload: bytes) -> CancelMsg:
     return CancelMsg(client_order_id)
 
 
+def encode_subscribe_fills() -> bytes:
+    return bytes([MsgType.SUBSCRIBE_FILLS])
+
+
 def decode_fill(payload: bytes) -> FillEvent:
-    return FillEvent(*struct.unpack(_FILL_FMT, payload))
+    resting_id, incoming_id, resting_side, price_ticks, quantity, timestamp = struct.unpack(_FILL_FMT, payload)
+    return FillEvent(resting_id, incoming_id, Side(resting_side), price_ticks, quantity, timestamp)
 
 
 def decode_ack(payload: bytes) -> AckEvent:

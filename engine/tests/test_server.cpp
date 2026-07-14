@@ -78,6 +78,11 @@ void send_cancel(int fd, uint64_t id) {
     send(fd, buf, sizeof(buf), 0);
 }
 
+void send_subscribe_fills(int fd) {
+    uint8_t tag = static_cast<uint8_t>(MsgType::SubscribeFills);
+    send(fd, &tag, 1, 0);
+}
+
 struct RecvMsg {
     uint8_t tag;
     std::vector<uint8_t> payload;
@@ -97,7 +102,9 @@ bool read_exact(int fd, uint8_t* buf, size_t len) {
 RecvMsg recv_message(int fd) {
     uint8_t tag;
     if (!read_exact(fd, &tag, 1)) return {0, {}, false};
-    size_t size = payload_size(tag);
+    std::optional<size_t> maybe_size = payload_size(tag);
+    if (!maybe_size.has_value()) return {0, {}, false};
+    size_t size = *maybe_size;
     std::vector<uint8_t> payload(size);
     if (size > 0 && !read_exact(fd, payload.data(), size)) return {0, {}, false};
     return {tag, payload, true};
@@ -173,6 +180,71 @@ void test_two_clients_both_get_fill() {
     server_thread.join();
 }
 
+void test_subscriber_receives_all_fills() {
+    OrderBookServer server(kTestPort + 5);
+    std::thread server_thread([&] { server.run(); });
+    int fd_a = connect_client(kTestPort + 5);
+    int fd_b = connect_client(kTestPort + 5);
+    int fd_sub = connect_client(kTestPort + 5);
+
+    send_subscribe_fills(fd_sub);
+
+    send_new_order(fd_a, 1, /*side=*/1 /*Sell*/, 0, 100, 50);
+    recv_message(fd_a);  // ack
+
+    send_new_order(fd_b, 2, /*side=*/0 /*Buy*/, 0, 100, 50);
+    recv_message(fd_b);  // ack
+    recv_message(fd_b);  // fill (B is the incoming counterparty)
+    recv_message(fd_a);  // fill (A is the resting counterparty)
+
+    RecvMsg observed = recv_message(fd_sub);
+    check(observed.ok, "the subscriber should receive a copy of the fill despite owning neither order");
+    check_eq<uint8_t>(observed.tag, static_cast<uint8_t>(MsgType::Fill), "subscriber's message should be a Fill");
+    if (observed.ok && observed.tag == static_cast<uint8_t>(MsgType::Fill)) {
+        FillWireMsg f = decode_fill(observed.payload.data());
+        check_eq<uint64_t>(f.resting_order_id, 1, "observed fill should reference resting order 1");
+        check_eq<uint64_t>(f.incoming_order_id, 2, "observed fill should reference incoming order 2");
+        check_eq<uint8_t>(f.resting_side, static_cast<uint8_t>(1) /*Sell*/,
+                           "resting_side should identify the resting order as a Sell");
+    }
+
+    close(fd_a);
+    close(fd_b);
+    close(fd_sub);
+    server.stop();
+    server_thread.join();
+}
+
+void test_non_subscriber_does_not_receive_others_fills() {
+    OrderBookServer server(kTestPort + 6);
+    std::thread server_thread([&] { server.run(); });
+    int fd_a = connect_client(kTestPort + 6);
+    int fd_b = connect_client(kTestPort + 6);
+    int fd_bystander = connect_client(kTestPort + 6);  // connected, but never subscribed
+
+    send_new_order(fd_a, 1, /*side=*/1, 0, 100, 50);
+    recv_message(fd_a);
+
+    send_new_order(fd_b, 2, /*side=*/0, 0, 100, 50);
+    recv_message(fd_b);
+    recv_message(fd_b);
+    recv_message(fd_a);
+
+    // The bystander submits its own unrelated order and should see only its
+    // own ack, never the A/B fill that happened before it subscribed to nothing.
+    send_new_order(fd_bystander, 3, /*side=*/1, 0, 200, 10);
+    RecvMsg msg = recv_message(fd_bystander);
+    check(msg.ok, "the bystander should still get its own ack");
+    check_eq<uint8_t>(msg.tag, static_cast<uint8_t>(MsgType::Ack),
+                       "an unsubscribed connection's only message should be its own ack, not someone else's fill");
+
+    close(fd_a);
+    close(fd_b);
+    close(fd_bystander);
+    server.stop();
+    server_thread.join();
+}
+
 void test_cancel_round_trip() {
     OrderBookServer server(kTestPort + 3);
     std::thread server_thread([&] { server.run(); });
@@ -223,6 +295,8 @@ int main() {
     test_rest_no_cross();
     test_crossing_orders_produce_fill();
     test_two_clients_both_get_fill();
+    test_subscriber_receives_all_fills();
+    test_non_subscriber_does_not_receive_others_fills();
     test_cancel_round_trip();
     test_malformed_tag_closes_only_that_connection();
 

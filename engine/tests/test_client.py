@@ -17,18 +17,20 @@ import sys
 
 NEW_ORDER = 0x01
 CANCEL = 0x02
+SUBSCRIBE_FILLS = 0x03
 FILL = 0x10
 ACK = 0x11
 
 # Big-endian ("!") to match the server's wire format.
 NEW_ORDER_FMT = "!QBBqI"   # client_order_id, side, order_type, price_ticks, quantity
 CANCEL_FMT = "!Q"          # client_order_id
-FILL_FMT = "!QQqIQ"        # resting_id, incoming_id, price_ticks, quantity, timestamp
+FILL_FMT = "!QQBqIQ"       # resting_id, incoming_id, resting_side, price_ticks, quantity, timestamp
 ACK_FMT = "!QBB"           # client_order_id, request_type, status
 
 PAYLOAD_SIZE = {
     NEW_ORDER: struct.calcsize(NEW_ORDER_FMT),
     CANCEL: struct.calcsize(CANCEL_FMT),
+    SUBSCRIBE_FILLS: 0,
     FILL: struct.calcsize(FILL_FMT),
     ACK: struct.calcsize(ACK_FMT),
 }

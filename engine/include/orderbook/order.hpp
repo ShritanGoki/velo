@@ -19,6 +19,7 @@ struct Order {
 struct Fill {
     uint64_t resting_order_id;
     uint64_t incoming_order_id;
+    Side resting_side;    // which side the resting order was on; incoming is the opposite
     int64_t price_ticks;
     uint32_t quantity;
     uint64_t timestamp;

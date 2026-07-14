@@ -30,14 +30,15 @@ uint64_t get_u64(const uint8_t*& p) {
 
 } // namespace
 
-size_t payload_size(uint8_t tag) {
+std::optional<size_t> payload_size(uint8_t tag) {
     switch (static_cast<MsgType>(tag)) {
         case MsgType::NewOrder: return kClientOrderMsgSize;
         case MsgType::Cancel: return kCancelMsgSize;
+        case MsgType::SubscribeFills: return size_t{0};
         case MsgType::Fill: return kFillWireMsgSize;
         case MsgType::Ack: return kAckMsgSize;
     }
-    return 0;
+    return std::nullopt;
 }
 
 void encode(const ClientOrderMsg& msg, uint8_t* out) {
@@ -74,6 +75,7 @@ void encode(const FillWireMsg& msg, uint8_t* out) {
     uint8_t* p = out;
     put_u64(p, msg.resting_order_id);
     put_u64(p, msg.incoming_order_id);
+    put_u8(p, msg.resting_side);
     put_u64(p, static_cast<uint64_t>(msg.price_ticks));
     put_u32(p, msg.quantity);
     put_u64(p, msg.timestamp);
@@ -84,6 +86,7 @@ FillWireMsg decode_fill(const uint8_t* in) {
     FillWireMsg msg{};
     msg.resting_order_id = get_u64(p);
     msg.incoming_order_id = get_u64(p);
+    msg.resting_side = get_u8(p);
     msg.price_ticks = static_cast<int64_t>(get_u64(p));
     msg.quantity = get_u32(p);
     msg.timestamp = get_u64(p);

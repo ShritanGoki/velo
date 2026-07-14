@@ -19,7 +19,7 @@ std::vector<Fill> OrderBook::matchBuy(Order& incoming) {
             Order& resting = level.orders.front();
             uint32_t traded = std::min(incoming.quantity, resting.quantity);
 
-            fills.push_back(Fill{resting.id, incoming.id, level.price_ticks,
+            fills.push_back(Fill{resting.id, incoming.id, Side::Sell, level.price_ticks,
                                   traded, next_timestamp_++});
 
             incoming.quantity -= traded;
@@ -54,7 +54,7 @@ std::vector<Fill> OrderBook::matchSell(Order& incoming) {
             Order& resting = level.orders.front();
             uint32_t traded = std::min(incoming.quantity, resting.quantity);
 
-            fills.push_back(Fill{resting.id, incoming.id, level.price_ticks,
+            fills.push_back(Fill{resting.id, incoming.id, Side::Buy, level.price_ticks,
                                   traded, next_timestamp_++});
 
             incoming.quantity -= traded;

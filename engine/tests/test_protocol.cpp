@@ -14,6 +14,14 @@ namespace {
 int g_failures = 0;
 int g_checks = 0;
 
+void check(bool condition, const std::string& message) {
+    ++g_checks;
+    if (!condition) {
+        ++g_failures;
+        std::cerr << "FAIL: " << message << "\n";
+    }
+}
+
 template <typename T>
 void check_eq(const T& actual, const T& expected, const std::string& message) {
     ++g_checks;
@@ -50,13 +58,14 @@ void test_cancel_round_trip() {
 }
 
 void test_fill_round_trip() {
-    FillWireMsg msg{1, 2, -500, 60, 999999};
+    FillWireMsg msg{1, 2, /*resting_side=*/1, -500, 60, 999999};
     uint8_t buf[kFillWireMsgSize];
     encode(msg, buf);
     FillWireMsg decoded = decode_fill(buf);
 
     check_eq(decoded.resting_order_id, msg.resting_order_id, "fill resting_order_id round-trips");
     check_eq(decoded.incoming_order_id, msg.incoming_order_id, "fill incoming_order_id round-trips");
+    check_eq(decoded.resting_side, msg.resting_side, "fill resting_side round-trips");
     check_eq(decoded.price_ticks, msg.price_ticks, "fill price_ticks round-trips");
     check_eq(decoded.quantity, msg.quantity, "fill quantity round-trips");
     check_eq(decoded.timestamp, msg.timestamp, "fill timestamp round-trips");
@@ -74,12 +83,14 @@ void test_ack_round_trip() {
 }
 
 void test_payload_size_lookup() {
-    check_eq(payload_size(static_cast<uint8_t>(MsgType::NewOrder)), kClientOrderMsgSize,
-              "NewOrder payload size");
-    check_eq(payload_size(static_cast<uint8_t>(MsgType::Cancel)), kCancelMsgSize, "Cancel payload size");
-    check_eq(payload_size(static_cast<uint8_t>(MsgType::Fill)), kFillWireMsgSize, "Fill payload size");
-    check_eq(payload_size(static_cast<uint8_t>(MsgType::Ack)), kAckMsgSize, "Ack payload size");
-    check_eq<size_t>(payload_size(0xFF), 0, "unknown tag should report size 0");
+    check(payload_size(static_cast<uint8_t>(MsgType::NewOrder)) == kClientOrderMsgSize,
+          "NewOrder payload size");
+    check(payload_size(static_cast<uint8_t>(MsgType::Cancel)) == kCancelMsgSize, "Cancel payload size");
+    check(payload_size(static_cast<uint8_t>(MsgType::SubscribeFills)) == 0,
+          "SubscribeFills payload size is legitimately empty");
+    check(payload_size(static_cast<uint8_t>(MsgType::Fill)) == kFillWireMsgSize, "Fill payload size");
+    check(payload_size(static_cast<uint8_t>(MsgType::Ack)) == kAckMsgSize, "Ack payload size");
+    check(!payload_size(0xFF).has_value(), "unknown tag should report nullopt");
 }
 
 } // namespace

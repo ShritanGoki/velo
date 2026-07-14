@@ -33,12 +33,16 @@ class TestProtocolRoundTrip(unittest.TestCase):
         self.assertEqual(protocol.decode_cancel(encoded[1:]), msg)
 
     def test_fill_round_trip(self):
-        fill = FillEvent(resting_order_id=1, incoming_order_id=2, price_ticks=-500,
-                          quantity=60, timestamp=999999)
+        fill = FillEvent(resting_order_id=1, incoming_order_id=2, resting_side=Side.SELL,
+                          price_ticks=-500, quantity=60, timestamp=999999)
         payload = struct.pack(protocol._FILL_FMT, fill.resting_order_id, fill.incoming_order_id,
-                               fill.price_ticks, fill.quantity, fill.timestamp)
+                               int(fill.resting_side), fill.price_ticks, fill.quantity, fill.timestamp)
         self.assertEqual(protocol.decode_fill(payload), fill)
         self.assertEqual(protocol.decode_event(MsgType.FILL, payload), fill)
+
+    def test_subscribe_fills_round_trip(self):
+        encoded = protocol.encode_subscribe_fills()
+        self.assertEqual(encoded, bytes([MsgType.SUBSCRIBE_FILLS]))
 
     def test_ack_round_trip(self):
         ack = AckEvent(client_order_id=7, request_type=int(MsgType.NEW_ORDER), status=1)
@@ -51,7 +55,8 @@ class TestProtocolRoundTrip(unittest.TestCase):
         # These sizes must match engine/include/orderbook/protocol.hpp exactly.
         self.assertEqual(protocol.payload_size(MsgType.NEW_ORDER), 22)
         self.assertEqual(protocol.payload_size(MsgType.CANCEL), 8)
-        self.assertEqual(protocol.payload_size(MsgType.FILL), 36)
+        self.assertEqual(protocol.payload_size(MsgType.SUBSCRIBE_FILLS), 0)
+        self.assertEqual(protocol.payload_size(MsgType.FILL), 37)
         self.assertEqual(protocol.payload_size(MsgType.ACK), 10)
         self.assertIsNone(protocol.payload_size(0xFF))
 

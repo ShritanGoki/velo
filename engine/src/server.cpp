@@ -26,6 +26,7 @@ namespace {
 struct Connection {
     int fd;
     std::vector<uint8_t> read_buf;
+    bool subscribed_to_fills = false;
 };
 
 void set_nonblocking(int fd) {
@@ -69,6 +70,7 @@ struct OrderBookServer::Impl {
     void remove_connection(int fd);
     void send_ack(int fd, uint64_t order_id, uint8_t request_type, uint8_t status);
     void send_fill(int fd, const Fill& fill);
+    void broadcast_fill_to_subscribers(const Fill& fill, const std::vector<int>& already_sent_to);
 };
 
 void OrderBookServer::Impl::start_listening() {
@@ -112,9 +114,21 @@ void OrderBookServer::Impl::send_fill(int fd, const Fill& fill) {
     uint8_t buf[1 + proto::kFillWireMsgSize];
     buf[0] = static_cast<uint8_t>(proto::MsgType::Fill);
     proto::encode(proto::FillWireMsg{fill.resting_order_id, fill.incoming_order_id,
+                                      static_cast<uint8_t>(fill.resting_side),
                                       fill.price_ticks, fill.quantity, fill.timestamp},
                   buf + 1);
     send_all(fd, buf, sizeof(buf));
+}
+
+void OrderBookServer::Impl::broadcast_fill_to_subscribers(const Fill& fill,
+                                                           const std::vector<int>& already_sent_to) {
+    for (const Connection& c : connections) {
+        if (!c.subscribed_to_fills) continue;
+        bool already_sent = std::find(already_sent_to.begin(), already_sent_to.end(), c.fd) !=
+                             already_sent_to.end();
+        if (already_sent) continue;
+        send_fill(c.fd, fill);
+    }
 }
 
 void OrderBookServer::Impl::dispatch_new_order(Connection& conn, const proto::ClientOrderMsg& msg) {
@@ -140,11 +154,17 @@ void OrderBookServer::Impl::dispatch_new_order(Connection& conn, const proto::Cl
     }
 
     for (const Fill& f : fills) {
+        std::vector<int> already_sent_to = {conn.fd};
         send_fill(conn.fd, f);
+
         auto it = order_owner_fd.find(f.resting_order_id);
         if (it != order_owner_fd.end() && it->second != conn.fd) {
             send_fill(it->second, f);
+            already_sent_to.push_back(it->second);
         }
+
+        broadcast_fill_to_subscribers(f, already_sent_to);
+
         if (!book.contains(f.resting_order_id)) {
             order_owner_fd.erase(f.resting_order_id);
         }
@@ -171,13 +191,14 @@ void OrderBookServer::Impl::handle_readable(Connection& conn) {
     for (;;) {
         if (conn.read_buf.empty()) return;
         uint8_t tag = conn.read_buf[0];
-        size_t payload = proto::payload_size(tag);
-        if (payload == 0) {
+        std::optional<size_t> maybe_payload = proto::payload_size(tag);
+        if (!maybe_payload.has_value()) {
             std::cerr << "orderbook::server: unknown message tag " << int(tag)
                       << ", closing connection\n";
             remove_connection(conn.fd);
             return;
         }
+        size_t payload = *maybe_payload;
         if (conn.read_buf.size() < 1 + payload) return;  // wait for more bytes
 
         const uint8_t* body = conn.read_buf.data() + 1;
@@ -187,6 +208,9 @@ void OrderBookServer::Impl::handle_readable(Connection& conn) {
                 break;
             case proto::MsgType::Cancel:
                 dispatch_cancel(conn, proto::decode_cancel(body));
+                break;
+            case proto::MsgType::SubscribeFills:
+                conn.subscribed_to_fills = true;
                 break;
             default:
                 std::cerr << "orderbook::server: unexpected client->server tag " << int(tag)

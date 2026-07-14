@@ -38,6 +38,12 @@ class OrderBookClient:
     def cancel(self, order_id: int) -> None:
         self._send(protocol.encode_cancel(protocol.CancelMsg(order_id)))
 
+    def subscribe_fills(self) -> None:
+        """Opts this connection into receiving every fill in the book, not
+        just ones it's a counterparty to - see
+        docs/risk-engine-design-doc.md §3.2."""
+        self._send(protocol.encode_subscribe_fills())
+
     def poll_events(self, timeout: Optional[float] = None) -> List[Event]:
         """Drains whatever events are already queued. If timeout is given,
         waits up to that long for at least one event before draining the

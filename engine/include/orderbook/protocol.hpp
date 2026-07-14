@@ -7,14 +7,16 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 namespace orderbook::proto {
 
 enum class MsgType : uint8_t {
-    NewOrder = 0x01,  // client -> server
-    Cancel = 0x02,    // client -> server
-    Fill = 0x10,      // server -> client
-    Ack = 0x11,       // server -> client
+    NewOrder = 0x01,      // client -> server
+    Cancel = 0x02,        // client -> server
+    SubscribeFills = 0x03,  // client -> server, empty payload
+    Fill = 0x10,          // server -> client
+    Ack = 0x11,           // server -> client
 };
 
 struct ClientOrderMsg {
@@ -34,11 +36,12 @@ inline constexpr size_t kCancelMsgSize = 8;
 struct FillWireMsg {
     uint64_t resting_order_id;
     uint64_t incoming_order_id;
+    uint8_t resting_side;  // 0 = Buy, 1 = Sell; incoming is the opposite
     int64_t price_ticks;
     uint32_t quantity;
     uint64_t timestamp;
 };
-inline constexpr size_t kFillWireMsgSize = 8 + 8 + 8 + 4 + 8;  // 36
+inline constexpr size_t kFillWireMsgSize = 8 + 8 + 1 + 8 + 4 + 8;  // 37
 
 struct AckMsg {
     uint64_t client_order_id;
@@ -49,7 +52,12 @@ inline constexpr size_t kAckMsgSize = 8 + 1 + 1;  // 10
 
 // Fixed payload size for a message type tag, or 0 if the tag is unknown
 // (callers should treat 0 as a protocol violation and close the connection).
-size_t payload_size(uint8_t tag);
+// Fixed payload size for a message type tag; nullopt if the tag is
+// unknown (callers should treat that as a protocol violation and close
+// the connection). SubscribeFills legitimately returns 0 - it has an
+// empty payload, which is why this returns an optional rather than using
+// 0 itself as the "unknown" sentinel.
+std::optional<size_t> payload_size(uint8_t tag);
 
 // `out`/`in` must point at buffers of at least k*MsgSize bytes (the tag
 // byte is handled separately by the caller, not part of these functions).
