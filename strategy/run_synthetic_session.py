@@ -12,8 +12,8 @@ import argparse
 
 from orderbook_client.client import OrderBookClient
 from orderbook_client.feed import SyntheticPriceFeed
-from orderbook_client.protocol import AckEvent, FillEvent
-from orderbook_client.strategy import CancelRequest, FixedOffsetQuoter, OrderRequest
+from orderbook_client.session_runner import run_strategy_loop
+from orderbook_client.strategy import FixedOffsetQuoter
 from orderbook_client.trade_log import TradeLog
 
 
@@ -27,40 +27,7 @@ def run_session(host: str, port: int, ticks: int, seed: int) -> TradeLog:
     log = TradeLog()
     client = OrderBookClient(host, port)
 
-    def drain(events) -> None:
-        for event in events:
-            if isinstance(event, AckEvent):
-                log.ack(event.client_order_id, event.status)
-            elif isinstance(event, FillEvent):
-                log.fill(event.resting_order_id, event.incoming_order_id,
-                          event.price_ticks, event.quantity)
-                strategy.on_fill(event.resting_order_id, event.incoming_order_id)
-
-    try:
-        for _ in range(ticks):
-            price = feed.next_price()
-            for action in strategy.on_price(price):
-                if isinstance(action, OrderRequest):
-                    client.submit_limit(action.order_id, action.side, action.price_ticks, action.quantity)
-                    log.order_sent(action.order_id, action.side, action.price_ticks, action.quantity)
-                elif isinstance(action, CancelRequest):
-                    client.cancel(action.order_id)
-                    log.cancel_sent(action.order_id)
-
-            drain(client.poll_events(timeout=0.05))
-
-        # A final drain until the connection goes quiet, so acks/fills for
-        # the last few ticks' orders aren't cut off by close() before the
-        # server's replies arrive. poll_events only waits for its *first*
-        # event per call, so looping until an empty call is what actually
-        # waits out stragglers rather than a single fixed-timeout call.
-        while True:
-            events = client.poll_events(timeout=0.2)
-            if not events:
-                break
-            drain(events)
-    finally:
-        client.close()
+    run_strategy_loop(feed, strategy, client, log, max_ticks=ticks)
 
     return log
 

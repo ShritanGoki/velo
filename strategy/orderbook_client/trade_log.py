@@ -27,9 +27,13 @@ class TradeLog:
         self._rows.append({"event": "ack", "order_id": order_id, "status": status,
                             "ts": time.time()})
 
-    def fill(self, resting_id: int, incoming_id: int, price_ticks: int, qty: int) -> None:
+    def fill(self, resting_id: int, incoming_id: int, incoming_side: int, price_ticks: int, qty: int) -> None:
+        # incoming_side is what Milestone 5's BacktestReport replays position
+        # from (see docs/historical-backtest-design-doc.md §6) - added here
+        # rather than re-deriving it, since FillEvent already carries it.
         self._rows.append({"event": "fill", "resting_id": resting_id, "incoming_id": incoming_id,
-                            "price_ticks": price_ticks, "qty": qty, "ts": time.time()})
+                            "incoming_side": int(incoming_side), "price_ticks": price_ticks,
+                            "qty": qty, "ts": time.time()})
 
     @property
     def rows(self) -> List[Dict[str, Any]]:

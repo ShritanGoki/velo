@@ -69,6 +69,10 @@ class FillEvent:
     quantity: int
     timestamp: int
 
+    @property
+    def incoming_side(self) -> Side:
+        return Side.SELL if self.resting_side == Side.BUY else Side.BUY
+
 
 @dataclass(frozen=True)
 class AckEvent:

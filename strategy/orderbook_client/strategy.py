@@ -46,10 +46,18 @@ class FixedOffsetQuoter:
 
     This repricing is what actually generates trade flow in the
     synthetic-only setting: since this strategy is the only participant,
-    a quote that never moves would never get crossed by anything. Each
-    tick's fresh order is submitted *before* the same side's stale one is
-    cancelled, so a big enough price move lets the new order cross the
-    previous tick's still-resting opposite-side quote before it's pulled.
+    a quote that never moves would never get crossed by anything. Both
+    sides' fresh orders are submitted *before either side's* stale order
+    is cancelled, so a big enough price move lets a new order cross the
+    previous tick's still-resting opposite-side quote before it's pulled -
+    in *either* direction. (An earlier version cancelled each side
+    immediately after requoting it, which meant only a new buy could ever
+    cross a stale sell - a new sell could never cross a stale buy, since
+    that buy had already been cancelled by the time the sell was
+    submitted. That asymmetry was invisible with synthetic zig-zag data
+    but showed up as a real backtest with zero closed trades once real,
+    trending ES history was fed through it - see
+    docs/historical-backtest-design-doc.md.)
     """
 
     def __init__(self, offset_ticks: int, size: int):
@@ -60,27 +68,27 @@ class FixedOffsetQuoter:
         self._resting_sell: Optional[Tuple[int, int]] = None
 
     def on_price(self, price_ticks: int) -> List[StrategyAction]:
-        actions: List[StrategyAction] = []
-        actions += self._requote(Side.BUY, price_ticks - self._offset)
-        actions += self._requote(Side.SELL, price_ticks + self._offset)
-        return actions
+        new_orders: List[StrategyAction] = []
+        cancels: List[StrategyAction] = []
 
-    def _requote(self, side: Side, target_price: int) -> List[StrategyAction]:
-        current = self._resting_buy if side == Side.BUY else self._resting_sell
-        if current is not None and current[1] == target_price:
-            return []  # already quoting at the right price, leave it resting
+        for side, target_price in ((Side.BUY, price_ticks - self._offset),
+                                    (Side.SELL, price_ticks + self._offset)):
+            current = self._resting_buy if side == Side.BUY else self._resting_sell
+            if current is not None and current[1] == target_price:
+                continue  # already quoting at the right price, leave it resting
 
-        order_id = next(self._ids)
-        actions: List[StrategyAction] = [OrderRequest(order_id, side, OrderType.LIMIT, target_price, self._size)]
-        if current is not None:
-            actions.append(CancelRequest(current[0]))
+            order_id = next(self._ids)
+            new_orders.append(OrderRequest(order_id, side, OrderType.LIMIT, target_price, self._size))
+            if current is not None:
+                cancels.append(CancelRequest(current[0]))
 
-        new_state = (order_id, target_price)
-        if side == Side.BUY:
-            self._resting_buy = new_state
-        else:
-            self._resting_sell = new_state
-        return actions
+            new_state = (order_id, target_price)
+            if side == Side.BUY:
+                self._resting_buy = new_state
+            else:
+                self._resting_sell = new_state
+
+        return new_orders + cancels
 
     def on_fill(self, resting_order_id: int, incoming_order_id: int) -> None:
         del incoming_order_id  # unused: only which side cleared matters here

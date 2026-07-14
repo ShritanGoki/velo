@@ -1,3 +1,5 @@
 engine/build/
 risk/target/
 __pycache__/
+strategy/.venv/
+strategy/data/
