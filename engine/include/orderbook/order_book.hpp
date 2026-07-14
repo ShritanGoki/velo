@@ -38,6 +38,11 @@ public:
     // filled or never existed) rather than throwing.
     bool cancel(uint64_t order_id);
 
+    // True if order_id is currently resting in the book (used by callers,
+    // e.g. the socket server, that need to distinguish "rejected as a
+    // duplicate" from "accepted but generated no fills").
+    bool contains(uint64_t order_id) const;
+
     std::optional<int64_t> best_bid() const;
     std::optional<int64_t> best_ask() const;
 

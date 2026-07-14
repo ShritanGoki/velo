@@ -131,6 +131,10 @@ bool OrderBook::cancel(uint64_t order_id) {
     return true;
 }
 
+bool OrderBook::contains(uint64_t order_id) const {
+    return order_index_.count(order_id) > 0;
+}
+
 std::optional<int64_t> OrderBook::best_bid() const {
     if (bids_.empty()) return std::nullopt;
     return bids_.begin()->first;

@@ -96,7 +96,7 @@ should be presentable at any milestone, not just at the very end.
 | # | Milestone | What's added | Status |
 |---|---|---|---|
 | 1 | **Core order book** | Standalone C++ limit order book, hardcoded orders, prints fills | Done |
-| 2 | **Engine as a live service** | Matching engine wrapped in a socket server, accepts orders over the wire | In progress |
+| 2 | **Engine as a live service** | Matching engine wrapped in a socket server, accepts orders over the wire | Done |
 | 3 | **End-to-end loop (synthetic data)** | Python strategy sends real orders to the engine over sockets; full pipeline works with synthetic/random prices | Planned |
 | 4 | **Risk engine joins the pipeline** | Rust service consumes fills, tracks P&L/position, logs risk state | Planned |
 | 5 | **Real historical data** | Synthetic prices replaced with real ES history via `yfinance`; first real backtest report | Planned |
@@ -141,7 +141,7 @@ trading-sim/
 
 ## Current Status
 
-Milestone 1 (core C++ order book) is done — see
-`docs/orderbook-design-doc.md`. Milestone 2 (matching engine as a live
-socket service) is in progress. See `docs/socket-service-design-doc.md`
-for the detailed design of the current milestone.
+Milestones 1 and 2 are done — see `docs/orderbook-design-doc.md` and
+`docs/socket-service-design-doc.md`. Milestone 3 (end-to-end loop with a
+Python strategy client and synthetic data) is designed but not yet
+implemented — see `docs/synthetic-loop-design-doc.md`.
