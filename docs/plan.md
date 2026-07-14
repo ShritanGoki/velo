@@ -97,7 +97,7 @@ should be presentable at any milestone, not just at the very end.
 |---|---|---|---|
 | 1 | **Core order book** | Standalone C++ limit order book, hardcoded orders, prints fills | Done |
 | 2 | **Engine as a live service** | Matching engine wrapped in a socket server, accepts orders over the wire | Done |
-| 3 | **End-to-end loop (synthetic data)** | Python strategy sends real orders to the engine over sockets; full pipeline works with synthetic/random prices | Planned |
+| 3 | **End-to-end loop (synthetic data)** | Python strategy sends real orders to the engine over sockets; full pipeline works with synthetic/random prices | Done |
 | 4 | **Risk engine joins the pipeline** | Rust service consumes fills, tracks P&L/position, logs risk state | Planned |
 | 5 | **Real historical data** | Synthetic prices replaced with real ES history via `yfinance`; first real backtest report | Planned |
 | 6 | **Live IBKR data** | Historical replay replaced with live paper-trading feed | Planned |
@@ -141,7 +141,7 @@ trading-sim/
 
 ## Current Status
 
-Milestones 1 and 2 are done — see `docs/orderbook-design-doc.md` and
-`docs/socket-service-design-doc.md`. Milestone 3 (end-to-end loop with a
-Python strategy client and synthetic data) is designed but not yet
-implemented — see `docs/synthetic-loop-design-doc.md`.
+Milestones 1–3 are done — see `docs/orderbook-design-doc.md`,
+`docs/socket-service-design-doc.md`, and `docs/synthetic-loop-design-doc.md`.
+Milestone 4 (Rust risk engine joins the pipeline) is designed but not yet
+implemented — see `docs/risk-engine-design-doc.md`.
