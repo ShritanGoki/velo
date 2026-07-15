@@ -3,3 +3,4 @@ risk/target/
 __pycache__/
 strategy/.venv/
 strategy/data/
+.DS_Store

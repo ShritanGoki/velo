@@ -1,12 +1,16 @@
+aeventkit==2.1.0
 beautifulsoup4==4.15.0
 certifi==2026.6.17
 cffi==2.1.0
 charset-normalizer==3.4.9
 curl_cffi==0.15.0
+eventkit==1.0.3
+ib_async==2.1.0
 idna==3.18
 markdown-it-py==4.2.0
 mdurl==0.1.2
 multitasking==0.0.13
+nest-asyncio==1.6.0
 numpy==2.5.1
 pandas==3.0.3
 peewee==4.2.3
@@ -21,6 +25,7 @@ rich==15.0.0
 six==1.17.0
 soupsieve==2.8.4
 typing_extensions==4.16.0
+tzdata==2025.3
 urllib3==2.7.0
 websockets==16.1
 yfinance==1.5.1
