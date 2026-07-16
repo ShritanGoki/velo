@@ -7,7 +7,7 @@ BUILD_DIR := build
 
 CORE_SRCS := src/order_book.cpp src/protocol.cpp src/server.cpp
 
-.PHONY: all main server test test-orderbook test-protocol test-server clean
+.PHONY: all main server test test-orderbook test-protocol test-server bench bench-client clean
 
 all: main server test
 
@@ -15,6 +15,12 @@ main: $(BUILD_DIR)/main
 	./$(BUILD_DIR)/main
 
 server: $(BUILD_DIR)/orderbook_server
+
+bench: $(BUILD_DIR)/bench
+	./$(BUILD_DIR)/bench
+
+bench-client: $(BUILD_DIR)/bench_client
+	./$(BUILD_DIR)/bench_client
 
 test: test-orderbook test-protocol test-server
 
@@ -41,6 +47,12 @@ $(BUILD_DIR)/test_protocol: tests/test_protocol.cpp src/protocol.cpp include/ord
 
 $(BUILD_DIR)/test_server: tests/test_server.cpp $(CORE_SRCS) include/orderbook/*.hpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) tests/test_server.cpp $(CORE_SRCS) $(LDFLAGS) -o $@
+
+$(BUILD_DIR)/bench: src/bench_main.cpp src/order_book.cpp include/orderbook/*.hpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/bench_main.cpp src/order_book.cpp -o $@
+
+$(BUILD_DIR)/bench_client: src/bench_client_main.cpp src/protocol.cpp include/orderbook/*.hpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/bench_client_main.cpp src/protocol.cpp -o $@
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

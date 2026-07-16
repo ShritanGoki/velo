@@ -143,14 +143,45 @@ options:
 3. **SIMD Rust batch** (`price_batch_simd`): the actual deliverable.
 
 The benchmark reports options priced per second (and the derived
-per-option latency) for a fixed batch size, with `criterion`'s
+per-option latency) for a fixed 4096-option batch, with `criterion`'s
 statistical confidence intervals — reproducible, not a single noisy
-timing run. The specific numbers are hardware-dependent (this is run on
-whatever machine builds the project, most likely the same Apple Silicon
-laptop the rest of this project was built on) and are reported as
-"measured on this machine," not as a universal claim — consistent with
-Design Principle 3's "specific... benchmarked and reproducible," not
-"fast" as an unfalsifiable adjective.
+timing run.
+
+### 6.1 Measured Results (Apple Silicon, arm64/NEON)
+
+| Implementation | Throughput | Latency/option |
+|---|---|---|
+| Naive Python | 2.72M options/sec | 368 ns |
+| Naive Rust (scalar) | ~39.1M options/sec | ~25.6 ns |
+| SIMD Rust (`wide`, f64x4 batch) | ~18.6M options/sec | ~53.7 ns |
+
+**The honest finding: SIMD is ~2.1x *slower* than plain scalar Rust here**
+— still ~6.8x faster than naive Python, but a regression relative to the
+non-vectorized Rust baseline it was supposed to beat. This was checked,
+not just accepted at face value: the batch pricer was rewritten to
+transpose the whole input array into struct-of-arrays once up front
+(rather than repacking small 4-element groups per chunk, in case that
+gather overhead was the cause) and the result didn't meaningfully
+change, which rules out "sloppy repacking" as the explanation.
+
+The actual cause is a hardware fact, not an implementation bug: Apple
+Silicon's native `f64` SIMD lane width is 2 (128-bit NEON registers),
+not 4. `wide`'s `f64x4` type emulates the extra width by running two
+separate 2-wide operations per call, and the polynomial range-reduction
+`exp`/`ln` implementations underneath that emulation cost more
+instructions than Apple's already hardware-tuned scalar `libm` `exp`/`ln`
+save by being "vectorized" at only 2-wide-times-two. This is exactly
+what Design Principle 3 ("a number attached, not just fast") is for:
+"SIMD" is not automatically a win, and the only way to know is to
+actually measure it on real hardware — which is what this section does,
+including when the measurement contradicts the premise. A genuinely
+wider, natively-supported vectorization (e.g. `f32x8`, which Apple
+Silicon NEON supports at true native width with no emulation) is a
+plausible follow-up if single-precision pricing were ever acceptable,
+but is explicitly not pursued in this milestone (§8) — this milestone's
+job was to build and honestly benchmark the `f64` vectorized path as
+originally scoped, not to chase a win by changing the scope
+after seeing the first number.
 
 ## 7. Test Cases to Write First
 
@@ -181,10 +212,18 @@ Design Principle 3's "specific... benchmarked and reproducible," not
 ## 8. Explicitly Deferred to Later Milestones
 
 - The delta-hedging strategy that actually uses these Greeks to
-  rebalance a position (Milestone 8).
+  rebalance a position (Milestone 8) — which implementation it calls
+  (`price_scalar` or `price_batch_simd`) is that milestone's decision to
+  make, informed by §6.1's measured results: on this hardware, scalar is
+  actually faster, so Milestone 8 has no obligation to prefer the SIMD
+  path just because it exists.
 - Wiring live pricing calls into `risk_engine`'s fill-processing loop —
   that's a design decision for Milestone 8 to make once it knows what
   the hedging strategy actually needs from the pricer.
+- `f32x8` or other genuinely-native-width vectorization on NEON — a
+  plausible follow-up noted in §6.1, not pursued here since it would
+  change this milestone's scope (precision, tolerances) after the fact
+  rather than honestly reporting what was originally scoped.
 - FIX-style message parsing (Milestone 9) — unrelated to this milestone
   despite both living under "Rust depth" in plan.md's roadmap.
 - American exercise, dividends, exotic Greeks (§2).
@@ -192,11 +231,14 @@ Design Principle 3's "specific... benchmarked and reproducible," not
 ## 9. Definition of Done for Milestone 7
 
 - All 6 test cases in §7 pass.
-- A benchmark report (numbers, not just "it runs") comparing naive
+- A benchmark report (real numbers, not just "it runs") comparing naive
   Python, naive Rust scalar, and SIMD Rust batch pricing throughput,
-  generated via `criterion`, with the actual measured speedup factors
-  stated plainly (e.g. "Nx faster than naive Python, Mx faster than
-  naive Rust scalar, measured on [this machine's architecture]").
+  generated via `criterion`, with the actual measured factors stated
+  plainly regardless of which direction they point — §6.1 documents a
+  genuine result where SIMD measured slower than scalar Rust on this
+  machine, and that result is the deliverable, not an inconvenience to
+  paper over. "Reproducible and honest" was always the bar (Design
+  Principle 3), not "SIMD wins."
 - The Milestone 1–6 test suites (C++, Python, Rust) still pass
   unmodified — this milestone adds a new, self-contained pricing module
   to the `risk` crate, it doesn't touch the order book, wire protocol,

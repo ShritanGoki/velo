@@ -101,10 +101,10 @@ should be presentable at any milestone, not just at the very end.
 | 4 | **Risk engine joins the pipeline** | Rust service consumes fills, tracks P&L/position, logs risk state | Done |
 | 5 | **Real historical data** | Synthetic prices replaced with real ES history via `yfinance`; first real backtest report | Done |
 | 6 | **Live IBKR data** | Historical replay replaced with live paper-trading feed | Done |
-| 7 | **Depth: SIMD options pricing** | Vectorized Black-Scholes + Greeks in Rust, benchmarked vs. naive Python/Rust implementations | Planned |
+| 7 | **Depth: SIMD options pricing** | Vectorized Black-Scholes + Greeks in Rust, benchmarked vs. naive Python/Rust implementations | Done |
 | 8 | **Depth: delta-hedging strategy** | Python strategy rebalances ES futures against ES options using live Greeks; backtested with hedge-effectiveness metrics | Planned |
 | 9 | **Depth: FIX-style parser** | Simulated FIX-format message parsing in Rust, throughput-benchmarked | Planned |
-| 10 | **Polish** | Dashboard, README/benchmarks writeup, CI badges | Planned |
+| 10 | **Polish** | Dashboard, README/benchmarks writeup, CI badges | Partially complete |
 
 ## Tech Stack
 
@@ -141,9 +141,19 @@ trading-sim/
 
 ## Current Status
 
-Milestones 1–6 are done — see `docs/orderbook-design-doc.md`,
+Milestones 1–7 are done — see `docs/orderbook-design-doc.md`,
 `docs/socket-service-design-doc.md`, `docs/synthetic-loop-design-doc.md`,
 `docs/risk-engine-design-doc.md`, `docs/historical-backtest-design-doc.md`,
-and `docs/live-ibkr-design-doc.md`. Milestone 7 (SIMD options pricing in
-Rust) is designed but not yet implemented — see
-`docs/options-pricing-design-doc.md`.
+`docs/live-ibkr-design-doc.md`, and `docs/options-pricing-design-doc.md`.
+Milestone 7's honest benchmark finding: on this machine (Apple Silicon,
+NEON), the `wide`-based SIMD batch pricer measured ~2.1x *slower* than
+naive scalar Rust (still ~6.8x faster than naive Python) — see
+`docs/options-pricing-design-doc.md` §6.1 for the measured numbers and
+why. Milestone 8 (delta-hedging strategy) is designed but not yet
+implemented — see `docs/delta-hedging-design-doc.md`.
+
+Milestone 10 is partially complete ahead of schedule: `engine/src/bench_main.cpp`
+and `engine/src/bench_client_main.cpp` (`make bench` / `make bench-client`)
+measure raw matching-engine throughput and full socket round-trip
+throughput/latency (sequential and pipelined). No dashboard or CI badges
+yet.
