@@ -11,7 +11,7 @@ import itertools
 from dataclasses import dataclass
 from typing import List, Optional, Protocol, Tuple, Union
 
-from .protocol import OrderType, Side
+from .protocol import FillEvent, OrderType, Side
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class Strategy(Protocol):
     def on_price(self, price_ticks: int) -> List[StrategyAction]:
         ...
 
-    def on_fill(self, resting_order_id: int, incoming_order_id: int) -> None:
+    def on_fill(self, event: FillEvent) -> None:
         ...
 
 
@@ -90,9 +90,11 @@ class FixedOffsetQuoter:
 
         return new_orders + cancels
 
-    def on_fill(self, resting_order_id: int, incoming_order_id: int) -> None:
-        del incoming_order_id  # unused: only which side cleared matters here
-        if self._resting_buy is not None and resting_order_id == self._resting_buy[0]:
+    def on_fill(self, event: FillEvent) -> None:
+        # Only which side cleared matters here - unlike DeltaHedger
+        # (Milestone 8), this strategy doesn't need to track its own
+        # position from fill quantities.
+        if self._resting_buy is not None and event.resting_order_id == self._resting_buy[0]:
             self._resting_buy = None
-        elif self._resting_sell is not None and resting_order_id == self._resting_sell[0]:
+        elif self._resting_sell is not None and event.resting_order_id == self._resting_sell[0]:
             self._resting_sell = None

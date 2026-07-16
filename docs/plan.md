@@ -102,7 +102,7 @@ should be presentable at any milestone, not just at the very end.
 | 5 | **Real historical data** | Synthetic prices replaced with real ES history via `yfinance`; first real backtest report | Done |
 | 6 | **Live IBKR data** | Historical replay replaced with live paper-trading feed | Done |
 | 7 | **Depth: SIMD options pricing** | Vectorized Black-Scholes + Greeks in Rust, benchmarked vs. naive Python/Rust implementations | Done |
-| 8 | **Depth: delta-hedging strategy** | Python strategy rebalances ES futures against ES options using live Greeks; backtested with hedge-effectiveness metrics | Planned |
+| 8 | **Depth: delta-hedging strategy** | Python strategy rebalances ES futures against ES options using live Greeks; backtested with hedge-effectiveness metrics | Done |
 | 9 | **Depth: FIX-style parser** | Simulated FIX-format message parsing in Rust, throughput-benchmarked | Planned |
 | 10 | **Polish** | Dashboard, README/benchmarks writeup, CI badges | Partially complete |
 
@@ -149,8 +149,16 @@ Milestone 7's honest benchmark finding: on this machine (Apple Silicon,
 NEON), the `wide`-based SIMD batch pricer measured ~2.1x *slower* than
 naive scalar Rust (still ~6.8x faster than naive Python) — see
 `docs/options-pricing-design-doc.md` §6.1 for the measured numbers and
-why. Milestone 8 (delta-hedging strategy) is designed but not yet
-implemented — see `docs/delta-hedging-design-doc.md`.
+why.
+
+Milestone 8 is done — see `docs/delta-hedging-design-doc.md`. A new
+`pricing_server` Rust binary exposes `price_scalar` over its own socket
+protocol; `DeltaHedger` (Python) prices a fixed options book live and
+rebalances ES futures through `orderbook_server` within a hedge-error
+tolerance band. A demo run (300 synthetic ticks, 100-lot ATM call book)
+showed one large initial rehedge and a 99.3% P&L variance reduction vs.
+the unhedged book. Milestone 9 (FIX-style parser in Rust) is next and not
+yet started.
 
 Milestone 10 is partially complete ahead of schedule: `engine/src/bench_main.cpp`
 and `engine/src/bench_client_main.cpp` (`make bench` / `make bench-client`)

@@ -6,8 +6,13 @@ import unittest
 
 import _pathfix  # noqa: F401
 
-from orderbook_client.protocol import Side
+from orderbook_client.protocol import FillEvent, Side
 from orderbook_client.strategy import CancelRequest, FixedOffsetQuoter, OrderRequest
+
+
+def fill_event(resting_order_id: int, incoming_order_id: int) -> FillEvent:
+    return FillEvent(resting_order_id=resting_order_id, incoming_order_id=incoming_order_id,
+                      resting_side=Side.SELL, price_ticks=10000, quantity=10, timestamp=0)
 
 
 class TestFixedOffsetQuoter(unittest.TestCase):
@@ -51,9 +56,9 @@ class TestFixedOffsetQuoter(unittest.TestCase):
         first = quoter.on_price(10000)
         buy_id = next(a.order_id for a in first if isinstance(a, OrderRequest) and a.side == Side.BUY)
 
-        quoter.on_fill(resting_order_id=buy_id, incoming_order_id=999)
+        quoter.on_fill(fill_event(resting_order_id=buy_id, incoming_order_id=999))
         # An unrelated id shouldn't clear anything.
-        quoter.on_fill(resting_order_id=424242, incoming_order_id=999)
+        quoter.on_fill(fill_event(resting_order_id=424242, incoming_order_id=999))
 
         # The buy side no longer has anything resting (it was just filled),
         # so even at the same price it must be freshly re-quoted; the sell

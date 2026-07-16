@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .client import OrderBookClient
-from .protocol import AckEvent, FillEvent
+from .protocol import AckEvent, FillEvent, OrderType
 from .strategy import CancelRequest, OrderRequest, Strategy
 from .trade_log import TradeLog
 
@@ -28,7 +28,7 @@ def run_strategy_loop(feed, strategy: Strategy, client: OrderBookClient, log: Tr
             elif isinstance(event, FillEvent):
                 log.fill(event.resting_order_id, event.incoming_order_id,
                           event.incoming_side, event.price_ticks, event.quantity)
-                strategy.on_fill(event.resting_order_id, event.incoming_order_id)
+                strategy.on_fill(event)
 
     ticks_done = 0
     try:
@@ -41,7 +41,10 @@ def run_strategy_loop(feed, strategy: Strategy, client: OrderBookClient, log: Tr
 
             for action in strategy.on_price(price):
                 if isinstance(action, OrderRequest):
-                    client.submit_limit(action.order_id, action.side, action.price_ticks, action.quantity)
+                    if action.order_type == OrderType.MARKET:
+                        client.submit_market(action.order_id, action.side, action.quantity)
+                    else:
+                        client.submit_limit(action.order_id, action.side, action.price_ticks, action.quantity)
                     log.order_sent(action.order_id, action.side, action.price_ticks, action.quantity)
                 elif isinstance(action, CancelRequest):
                     client.cancel(action.order_id)
