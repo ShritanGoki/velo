@@ -1,3 +1,4 @@
+pub mod fix;
 pub mod limits;
 pub mod position;
 pub mod pricing;

@@ -13,3 +13,7 @@ libm = "0.2.16"
 [[bench]]
 name = "pricing_bench"
 harness = false
+
+[[bench]]
+name = "fix_bench"
+harness = false
